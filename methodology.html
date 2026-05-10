@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sports Broadcast Audio Remixer — Methodology</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --card: #16161f;
+    --border: #22222e;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --accent3: #7c3aed;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --phase1: #00e5ff;
+    --phase2: #ff6b35;
+    --phase3: #a855f7;
+    --phase4: #22c55e;
+    --phase5: #f59e0b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* HEADER */
+  header {
+    padding: 4rem 0 2rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4rem;
+  }
+
+  .tag {
+    display: inline-block;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 0.25rem 0.75rem;
+    margin-bottom: 1.5rem;
+    animation: fadeDown 0.6s ease both;
+  }
+
+  h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    animation: fadeDown 0.6s 0.1s ease both;
+  }
+
+  h1 span {
+    color: var(--accent);
+  }
+
+  .subtitle {
+    margin-top: 1rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+    line-height: 1.7;
+    max-width: 600px;
+    animation: fadeDown 0.6s 0.2s ease both;
+  }
+
+  /* PIPELINE OVERVIEW */
+  .pipeline-section {
+    margin-bottom: 5rem;
+    animation: fadeUp 0.7s 0.3s ease both;
+  }
+
+  .section-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding-bottom: 1rem;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .pipe-node {
+    flex-shrink: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 1rem 1.25rem;
+    text-align: center;
+    min-width: 130px;
+    position: relative;
+    transition: border-color 0.2s;
+  }
+
+  .pipe-node:hover { border-color: var(--accent); }
+
+  .pipe-node .num {
+    font-size: 0.6rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    display: block;
+    margin-bottom: 0.4rem;
+  }
+
+  .pipe-node .label {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  .pipe-arrow {
+    flex-shrink: 0;
+    width: 2rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .pipe-node[data-phase="1"] { border-top: 2px solid var(--phase1); }
+  .pipe-node[data-phase="2"] { border-top: 2px solid var(--phase2); }
+  .pipe-node[data-phase="3"] { border-top: 2px solid var(--phase3); }
+  .pipe-node[data-phase="4"] { border-top: 2px solid var(--phase4); }
+  .pipe-node[data-phase="5"] { border-top: 2px solid var(--phase5); }
+
+  /* PHASES */
+  .phases { display: flex; flex-direction: column; gap: 3rem; margin-bottom: 5rem; }
+
+  .phase {
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 2rem;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+
+  .phase.visible { opacity: 1; transform: translateY(0); }
+
+  .phase-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.5rem;
+    margin-bottom: 1.75rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .phase-number {
+    font-family: 'Syne', sans-serif;
+    font-size: 3rem;
+    font-weight: 800;
+    line-height: 1;
+    opacity: 0.15;
+    flex-shrink: 0;
+  }
+
+  .phase-meta { flex: 1; }
+
+  .phase-tag {
+    font-size: 0.6rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    display: block;
+  }
+
+  .phase-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .phase-desc {
+    color: var(--muted);
+    font-size: 0.78rem;
+    line-height: 1.8;
+  }
+
+  /* Phase colors */
+  .phase[data-phase="1"] .phase-tag { color: var(--phase1); }
+  .phase[data-phase="1"] .phase-number { color: var(--phase1); }
+  .phase[data-phase="2"] .phase-tag { color: var(--phase2); }
+  .phase[data-phase="2"] .phase-number { color: var(--phase2); }
+  .phase[data-phase="3"] .phase-tag { color: var(--phase3); }
+  .phase[data-phase="3"] .phase-number { color: var(--phase3); }
+  .phase[data-phase="4"] .phase-tag { color: var(--phase4); }
+  .phase[data-phase="4"] .phase-number { color: var(--phase4); }
+  .phase[data-phase="5"] .phase-tag { color: var(--phase5); }
+  .phase[data-phase="5"] .phase-number { color: var(--phase5); }
+
+  /* WORKFLOW DIAGRAM */
+  .workflow { margin-top: 0; }
+
+  .wf-title {
+    font-size: 0.65rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  .wf-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .wf-step {
+    display: flex;
+    gap: 1.25rem;
+    align-items: flex-start;
+  }
+
+  .wf-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .wf-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--border);
+    border: 2px solid var(--muted);
+    flex-shrink: 0;
+    margin-top: 3px;
+  }
+
+  .wf-step.active .wf-dot {
+    background: currentColor;
+    border-color: currentColor;
+  }
+
+  .wf-connector {
+    width: 1px;
+    flex: 1;
+    min-height: 1.5rem;
+    background: var(--border);
+    margin: 2px 0;
+  }
+
+  .wf-content {
+    padding-bottom: 1.5rem;
+    flex: 1;
+  }
+
+  .wf-step-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    margin-bottom: 0.3rem;
+  }
+
+  .wf-step-detail {
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  .wf-step-detail code {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 0.1rem 0.4rem;
+    font-size: 0.68rem;
+    color: var(--accent);
+  }
+
+  /* LATENCY CALLOUT */
+  .callout {
+    border: 1px solid var(--accent2);
+    background: rgba(255, 107, 53, 0.06);
+    padding: 1.25rem 1.5rem;
+    margin: 1.5rem 0;
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .callout-icon {
+    font-size: 1rem;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .callout-body { flex: 1; }
+
+  .callout-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--accent2);
+    margin-bottom: 0.4rem;
+  }
+
+  .callout-text {
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  /* LATENCY VISUAL */
+  .latency-bar {
+    margin: 1.5rem 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1.25rem;
+  }
+
+  .latency-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1rem;
+  }
+
+  .timeline {
+    position: relative;
+    height: 48px;
+    display: flex;
+    align-items: center;
+  }
+
+  .tl-track {
+    position: absolute;
+    inset: 50% 0;
+    height: 2px;
+    background: var(--border);
+    transform: translateY(-50%);
+  }
+
+  .tl-segments {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+  }
+
+  .tl-seg {
+    position: absolute;
+    height: 6px;
+    border-radius: 3px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .tl-live   { left: 0; width: 60%; background: var(--phase1); opacity: 0.8; }
+  .tl-proc   { left: 15%; width: 60%; background: var(--phase2); opacity: 0.8; }
+  .tl-lag    { left: 59%; width: 2px; height: 24px; background: var(--accent2); opacity: 1; }
+
+  .tl-markers {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 0.5rem;
+    font-size: 0.62rem;
+    color: var(--muted);
+  }
+
+  .tl-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-right: 1rem;
+    font-size: 0.65rem;
+    color: var(--muted);
+  }
+
+  .tl-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+
+  .tl-legend {
+    display: flex;
+    gap: 0;
+    margin-top: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  /* TECH PILLS */
+  .tech-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+
+  .tech-pill {
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    padding: 0.25rem 0.6rem;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    background: var(--surface);
+  }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 2rem 0;
+    margin-top: 4rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.65rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  /* ANIMATIONS */
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+
+  .live-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #ef4444;
+    margin-right: 0.4rem;
+    animation: pulse 1.4s infinite;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <div class="tag">Project Methodology</div>
+    <h1>Sports Broadcast<br><span>Audio Remixer</span></h1>
+    <p class="subtitle">
+      A live stream audio separation system that decouples commentator speech from crowd noise,
+      enabling real-time custom remixing with a 10-second buffered processing window.
+    </p>
+  </header>
+
+  <!-- PIPELINE OVERVIEW -->
+  <section class="pipeline-section">
+    <div class="section-label">// end-to-end pipeline</div>
+    <div class="pipeline">
+      <div class="pipe-node" data-phase="1">
+        <span class="num">01</span>
+        <span class="label">Live Stream Ingestion</span>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node" data-phase="2">
+        <span class="num">02</span>
+        <span class="label">Source Separation</span>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node" data-phase="3">
+        <span class="num">03</span>
+        <span class="label">Voice Command Control</span>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node" data-phase="4">
+        <span class="num">04</span>
+        <span class="label">Remixing & Reconstruction</span>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-node" data-phase="5">
+        <span class="num">05</span>
+        <span class="label">Output & Delivery</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- PHASES -->
+  <section>
+    <div class="section-label">// detailed phases</div>
+    <div class="phases">
+
+      <!-- PHASE 1 -->
+      <div class="phase" data-phase="1">
+        <div class="phase-header">
+          <div class="phase-number">01</div>
+          <div class="phase-meta">
+            <span class="phase-tag">Ingestion & Buffering</span>
+            <div class="phase-title">Live Stream Ingestion</div>
+            <div class="phase-desc">
+              Capture the incoming live video feed, extract audio in real time, and buffer it into
+              overlapping chunks. A deliberate 10-second processing lag is introduced here — the live feed
+              plays ahead while the system works on the buffered window behind it.
+            </div>
+          </div>
+        </div>
+
+        <div class="callout">
+          <div class="callout-icon">⏱</div>
+          <div class="callout-body">
+            <div class="callout-title">10-Second Lag Window</div>
+            <div class="callout-text">
+              The live stream is delayed by 10 seconds at the output layer. This window gives the
+              separation model enough time to process each audio chunk and produce clean stems before
+              the remixed audio reaches the viewer. Crossfading at chunk boundaries (50–100 ms overlap)
+              ensures the transition is completely smooth with no audible clicks or seams.
+            </div>
+          </div>
+        </div>
+
+        <div class="latency-bar">
+          <div class="latency-label">// lag window visualization</div>
+          <div class="timeline">
+            <div class="tl-track"></div>
+            <div class="tl-segments">
+              <div class="tl-seg tl-live"></div>
+              <div class="tl-seg tl-proc"></div>
+              <div class="tl-seg tl-lag"></div>
+            </div>
+          </div>
+          <div class="tl-legend">
+            <span class="tl-badge"><span class="tl-dot" style="background:var(--phase1)"></span>Raw live feed</span>
+            <span class="tl-badge"><span class="tl-dot" style="background:var(--phase2)"></span>Processed output (−10s)</span>
+            <span class="tl-badge"><span class="tl-dot" style="background:var(--accent2); width:4px; border-radius:1px;"></span>Processing lag boundary</span>
+          </div>
+        </div>
+
+        <div class="workflow">
+          <div class="wf-title">// workflow</div>
+          <div class="wf-steps">
+            <div class="wf-step active" style="color:var(--phase1)">
+              <div class="wf-line"><div class="wf-dot"></div><div class="wf-connector"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Receive Live Stream</div>
+                <div class="wf-step-detail">Ingest HLS / RTMP stream or local video feed. Extract raw audio at <code>44100 Hz</code> using FFmpeg with minimal latency flags (<code>-fflags nobuffer</code>).</div>
+              </div>
+            </div>
+            <div class="wf-step active" style="color:var(--phase1)">
+              <div class="wf-line"><div class="wf-dot"></div><div class="wf-connector"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Chunk & Buffer</div>
+                <div class="wf-step-detail">Split audio into overlapping 2–4 second chunks with 100 ms crossfade overlap. A circular buffer holds the last 10 seconds for processing.</div>
+              </div>
+            </div>
+            <div class="wf-step active" style="color:var(--phase1)">
+              <div class="wf-line"><div class="wf-dot"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Sync Video & Audio</div>
+                <div class="wf-step-detail">Delay video output by 10 seconds using an in-memory frame buffer to stay in sync with processed audio. No re-encoding needed — lossless video copy.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tech-row">
+          <span class="tech-pill">FFmpeg</span>
+          <span class="tech-pill">PyAudio / PortAudio</span>
+          <span class="tech-pill">Circular Buffer</span>
+          <span class="tech-pill">HLS / RTMP</span>
+          <span class="tech-pill">Crossfade Overlap-Add</span>
+        </div>
+      </div>
+
+      <!-- PHASE 2 -->
+      <div class="phase" data-phase="2">
+        <div class="phase-header">
+          <div class="phase-number">02</div>
+          <div class="phase-meta">
+            <span class="phase-tag">Core ML</span>
+            <div class="phase-title">Source Separation</div>
+            <div class="phase-desc">
+              Each buffered audio chunk is passed through a pre-trained deep learning model to isolate
+              the commentary (vocals) stem from the crowd and ambient background stem independently.
+            </div>
+          </div>
+        </div>
+
+        <div class="workflow">
+          <div class="wf-title">// workflow</div>
+          <div class="wf-steps">
+            <div class="wf-step active" style="color:var(--phase2)">
+              <div class="wf-line"><div class="wf-dot"></div><div class="wf-connector"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Load Pre-trained Model</div>
+                <div class="wf-step-detail">Use <code>Demucs htdemucs</code> or <code>UVR-MDX-NET-Voc_FT</code> in two-stems mode. Model is loaded once at startup and kept in memory for low-latency inference.</div>
+              </div>
+            </div>
+            <div class="wf-step active" style="color:var(--phase2)">
+              <div class="wf-line"><div class="wf-dot"></div><div class="wf-connector"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Run Inference per Chunk</div>
+                <div class="wf-step-detail">Each 2–4 second chunk is processed independently, producing two stems: <code>vocals.wav</code> (commentary) and <code>no_vocals.wav</code> (crowd + ambient).</div>
+              </div>
+            </div>
+            <div class="wf-step active" style="color:var(--phase2)">
+              <div class="wf-line"><div class="wf-dot"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Crossfade at Boundaries</div>
+                <div class="wf-step-detail">Overlap-add stitching at chunk edges using a 100 ms Hann window crossfade to eliminate seams between processed segments.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tech-row">
+          <span class="tech-pill">Demucs htdemucs</span>
+          <span class="tech-pill">UVR-MDX-NET-Voc_FT</span>
+          <span class="tech-pill">PyTorch</span>
+          <span class="tech-pill">Overlap-Add (OLA)</span>
+          <span class="tech-pill">GPU Inference</span>
+        </div>
+      </div>
+
+      <!-- PHASE 3 -->
+      <div class="phase" data-phase="3">
+        <div class="phase-header">
+          <div class="phase-number">03</div>
+          <div class="phase-meta">
+            <span class="phase-tag">Voice Interface</span>
+            <div class="phase-title">Voice-Controlled Remixing</div>
+            <div class="phase-desc">
+              The user issues natural language voice commands in real time. Speech is transcribed,
+              parsed for intent, and translated into gain parameters applied to the separated stems.
+            </div>
+          </div>
+        </div>
+
+        <div class="workflow">
+          <div class="wf-title">// workflow</div>
+          <div class="wf-steps">
+            <div class="wf-step active" style="color:var(--phase3)">
+              <div class="wf-line"><div class="wf-dot"></div><div class="wf-connector"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Capture Voice Command</div>
+                <div class="wf-step-detail">Record from microphone via browser API or <code>PyAudio</code>. VAD (Voice Activity Detection) triggers recording start/stop to avoid continuous polling.</div>
+              </div>
+            </div>
+            <div class="wf-step active" style="color:var(--phase3)">
+              <div class="wf-line"><div class="wf-dot"></div><div class="wf-connector"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Transcribe with Whisper</div>
+                <div class="wf-step-detail">Pass voice clip to <code>Whisper tiny/base</code> for fast, local speech-to-text. Runs in under 300 ms for short commands on CPU.</div>
+              </div>
+            </div>
+            <div class="wf-step active" style="color:var(--phase3)">
+              <div class="wf-line"><div class="wf-dot"></div><div class="wf-connector"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Parse Intent</div>
+                <div class="wf-step-detail">Rule-based parser maps transcribed text to commands: <code>mute commentary</code>, <code>amplify crowd</code>, <code>boost crowd by 20%</code>, <code>balanced mix</code>. Fallback to keyword matching if intent is ambiguous.</div>
+              </div>
+            </div>
+            <div class="wf-step active" style="color:var(--phase3)">
+              <div class="wf-line"><div class="wf-dot"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Resolve Gain Parameters</div>
+                <div class="wf-step-detail">Translate parsed intent to <code>commentary_db</code> and <code>crowd_db</code> values. Pass parameters to the remix engine for the next chunk window.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tech-row">
+          <span class="tech-pill">Whisper tiny/base</span>
+          <span class="tech-pill">WebRTC VAD</span>
+          <span class="tech-pill">PyAudio</span>
+          <span class="tech-pill">Intent Parser</span>
+          <span class="tech-pill">Web Speech API</span>
+        </div>
+      </div>
+
+      <!-- PHASE 4 -->
+      <div class="phase" data-phase="4">
+        <div class="phase-header">
+          <div class="phase-number">04</div>
+          <div class="phase-meta">
+            <span class="phase-tag">Audio Engine</span>
+            <div class="phase-title">Remixing & Reconstruction</div>
+            <div class="phase-desc">
+              Apply user-resolved gain parameters to the separated stems, mix them back into a single
+              audio track, and remux with the delayed video stream for synchronized output.
+            </div>
+          </div>
+        </div>
+
+        <div class="workflow">
+          <div class="wf-title">// workflow</div>
+          <div class="wf-steps">
+            <div class="wf-step active" style="color:var(--phase4)">
+              <div class="wf-line"><div class="wf-dot"></div><div class="wf-connector"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Apply Gain to Stems</div>
+                <div class="wf-step-detail">Attenuate or amplify <code>vocals</code> and <code>no_vocals</code> stems using resolved dB values. Uses pydub <code>AudioSegment</code> arithmetic or raw numpy gain multiplication.</div>
+              </div>
+            </div>
+            <div class="wf-step active" style="color:var(--phase4)">
+              <div class="wf-line"><div class="wf-dot"></div><div class="wf-connector"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Smooth Gain Transitions</div>
+                <div class="wf-step-detail">When user changes preference mid-stream, apply a linear gain ramp over 200–500 ms to avoid abrupt level jumps. Ensures perceptually smooth transitions.</div>
+              </div>
+            </div>
+            <div class="wf-step active" style="color:var(--phase4)">
+              <div class="wf-line"><div class="wf-dot"></div><div class="wf-connector"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Mix Stems</div>
+                <div class="wf-step-detail">Overlay adjusted stems: <code>final = crowd_adjusted.overlay(commentary_adjusted)</code>. Normalize output to prevent clipping.</div>
+              </div>
+            </div>
+            <div class="wf-step active" style="color:var(--phase4)">
+              <div class="wf-line"><div class="wf-dot"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Remux with Video</div>
+                <div class="wf-step-detail">Attach processed audio to the delayed video stream using FFmpeg lossless copy. Output as AAC 192kbps or pass through PCM for low-latency playback.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tech-row">
+          <span class="tech-pill">pydub</span>
+          <span class="tech-pill">numpy</span>
+          <span class="tech-pill">FFmpeg remux</span>
+          <span class="tech-pill">Linear Gain Ramp</span>
+          <span class="tech-pill">AAC 192kbps</span>
+        </div>
+      </div>
+
+      <!-- PHASE 5 -->
+      <div class="phase" data-phase="5">
+        <div class="phase-header">
+          <div class="phase-number">05</div>
+          <div class="phase-meta">
+            <span class="phase-tag">Output & Delivery</span>
+            <div class="phase-title">Output & Delivery</div>
+            <div class="phase-desc">
+              Stream the processed video+audio output to the viewer's player with a consistent
+              10-second lag offset. Optionally save a remixed recording for download.
+            </div>
+          </div>
+        </div>
+
+        <div class="workflow">
+          <div class="wf-title">// workflow</div>
+          <div class="wf-steps">
+            <div class="wf-step active" style="color:var(--phase5)">
+              <div class="wf-line"><div class="wf-dot"></div><div class="wf-connector"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Stream to Player</div>
+                <div class="wf-step-detail">Push processed chunks to the frontend video player via Flask streaming response or WebSocket. Player receives a continuous remixed stream at a stable 10s offset from live.</div>
+              </div>
+            </div>
+            <div class="wf-step active" style="color:var(--phase5)">
+              <div class="wf-line"><div class="wf-dot"></div><div class="wf-connector"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Optional: Save Recording</div>
+                <div class="wf-step-detail">Accumulate processed chunks into a final output file. Serve as downloadable <code>.mp4</code> via <code>/media/processed/</code> endpoint at session end.</div>
+              </div>
+            </div>
+            <div class="wf-step active" style="color:var(--phase5)">
+              <div class="wf-line"><div class="wf-dot"></div></div>
+              <div class="wf-content">
+                <div class="wf-step-title">Cleanup</div>
+                <div class="wf-step-detail">Flush temp stems and buffer files from <code>/work/</code> directory after session ends. Keep final output in <code>/processed/</code> for user download window.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tech-row">
+          <span class="tech-pill">Flask Streaming</span>
+          <span class="tech-pill">WebSocket</span>
+          <span class="tech-pill">HLS Output</span>
+          <span class="tech-pill">FFmpeg concat</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <footer>
+    <span>Sports Broadcast Audio Remixer — Methodology v1.0</span>
+    <span><span class="live-dot"></span>Live Stream Pipeline</span>
+  </footer>
+
+</div>
+
+<script>
+  // Scroll-triggered reveal for phases
+  const phases = document.querySelectorAll('.phase');
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.08 });
+
+  phases.forEach(p => observer.observe(p));
+</script>
+
+</body>
+</html>
