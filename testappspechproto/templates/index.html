@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Video Audio Mixer Lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Syne:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="bg-layer"></div>
+    <main class="wrap">
+      <section class="hero card pop-in">
+        <p class="eyebrow">Flask + FFmpeg + Demucs Audio Lab</p>
+        <h1>Upload Video. Split Stems. Mix the Crowd.</h1>
+        <p>
+          Upload a match clip, extract stereo audio, then Demucs separates vocals from background.
+          Use the stem sliders to control commentary vs stadium volume.
+        </p>
+        <label class="upload-btn">
+          <input id="videoInput" type="file" accept="video/*" />
+          <span>Choose Video</span>
+        </label>
+        <p id="status" class="status">Waiting for upload...</p>
+      </section>
+
+      <section id="mixSection" class="grid">
+        <article class="card player pop-in delay-1">
+          <h2>Preview</h2>
+          <video id="videoPlayer" controls playsinline></video>
+          <div class="analysis">
+            <h3>Detected Audio Components</h3>
+            <div id="analysisBars" class="bars"></div>
+            <p id="analysisNote" class="muted"></p>
+          </div>
+        </article>
+
+        <article class="card mixer pop-in delay-2">
+          <h2>Stem Mixer</h2>
+          <p class="muted">Sliders control Demucs stems. 0% reduction keeps full volume.</p>
+          <div class="sliders">
+            <div class="slider-row">
+              <label for="commentary">Commentary (Vocals)</label>
+              <input id="commentary" type="range" min="0" max="100" value="0" disabled />
+              <span id="commentaryVal">0</span>
+              <small class="lane-desc">Reduce announcer stem. 100% = mute.</small>
+            </div>
+            <div class="slider-row">
+              <label for="stadium">Stadium (Background)</label>
+              <input id="stadium" type="range" min="0" max="100" value="0" disabled />
+              <span id="stadiumVal">0</span>
+              <small class="lane-desc">Control crowd + ambience stem.</small>
+            </div>
+          </div>
+
+          <div class="presets">
+            <button class="preset-btn" data-preset="commentary-reduce">Commentary Reduce</button>
+            <button class="preset-btn" data-preset="crowd-boost">Crowd Boost</button>
+            <button class="preset-btn" data-preset="balanced">Balanced</button>
+            <button class="preset-btn" data-preset="commentary-kill">Commentary Kill</button>
+          </div>
+          <p id="mixNote" class="muted"></p>
+
+          <div class="actions">
+            <span class="live-chip">Manual Apply Mode</span>
+            <button id="applyMixBtn" class="apply-btn" disabled>Apply Mix</button>
+            <span id="renderState" class="muted">Waiting for upload</span>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
