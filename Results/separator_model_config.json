@@ -1,0 +1,16 @@
+{
+  "model_type": "UNet1D",
+  "sample_rate": 16000,
+  "segment_seconds": 5.0,
+  "epochs_requested": 20,
+  "batch_size": 32,
+  "learning_rate": 0.0003,
+  "weight_decay": 1e-05,
+  "early_stop_patience": 5,
+  "early_stop_min_delta": 0.0001,
+  "train_loss": -6.176169024573432,
+  "val_loss": -5.071730613708496,
+  "test_loss": -5.07692813873291,
+  "best_model_path": "/kaggle/working/separator_output/separator_model_best.pt",
+  "output_dir": "/kaggle/working/separator_output"
+}

@@ -9,7 +9,10 @@ venv/
 
 # MAC OS
 .DS_Store
+
 # Large local media files
 match_clip.mp4
 output/*.mp4
 output/*.wav
+
+Results/*.flac
