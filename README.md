@@ -12,7 +12,7 @@ The goal is to let users remix sports audio based on their preference:
 
 ## Project Journey
 
-This README documents the project from start to finish. This is the first stage.
+This README documents the project from start to finish, stage by stage.
 
 ### Stage 1: Initial Python Module-Based Audio Splitting (Baseline Attempt)
 
@@ -60,3 +60,55 @@ Based on that research, I moved to a Demucs-based pipeline and built a basic Fla
 #### Outcome
 
 This stage gave much stronger separation quality than the initial prototype and made the project easier to demonstrate through a user-friendly web interface.
+
+### Stage 3: UNet Research and Custom Model Training
+
+Even though Demucs performed better than the first baseline, it still was not good enough for the target quality.
+
+So I referred to additional papers on UNet-based audio separation and decided to train a custom model on a dataset tailored to commentary separation.
+
+#### What this stage included
+
+- Reviewing UNet-focused research papers for speech/noise source separation
+- Building and training a UNet-based separator using a commentary dataset
+- Training with speech and crowd/noise targets and monitoring train/validation loss across epochs
+- Saving trained artifacts and configuration for reproducibility
+
+#### Outcome
+
+The custom UNet training showed improved and stable learning behavior, and the training results were documented with a loss curve.
+
+- Training notebook: `commentaryDataset/CommentaryDataset.ipynb`
+- Result plot: `commentaryDataset/Results/loss_curve.png`
+- Saved outputs: `commentaryDataset/Results/`
+
+### Stage 4: Building a Custom Dataset on Kaggle
+
+After training with the available commentary dataset, I decided to build my own larger synthetic dataset to improve data control and diversity.
+
+I created a Kaggle pipeline that generates sports-style speech/noise mixtures by combining clean speech with environmental audio.
+
+#### What this stage included
+
+- Notebook used: `CustomDataset/kaggle_build_dataset.ipynb`
+- Data sources:
+	- LibriSpeech (`train-clean-100`) as speech source
+	- ESC-50 as noise/crowd/environment source
+- Dataset design:
+	- 36,000 examples
+	- 5.0-second clips
+	- ~50 hours total target duration
+	- Train/Val/Test split of 90% / 5% / 5%
+- Audio generation pipeline:
+	- Scan and cap source speech hours
+	- Select sports-relevant ESC-50 classes (for example: crowd-like ambience, rain, thunderstorm, train, wind, clapping, siren)
+	- Trim/pad all clips to fixed duration and resample to 16 kHz mono
+	- Mix speech + noise with randomized SNR in the 0 to 12 dB range
+	- Export `mixtures`, `speech`, and `noise` stems per split
+- Reproducibility outputs:
+	- `metadata.csv` with file paths, source files, gains, and SNR values
+	- Final summary report with counts and split distribution
+
+#### Outcome
+
+This stage produced a custom, scalable training dataset that better matches the target sports-broadcast use case and gives stronger control for future model training and tuning.
