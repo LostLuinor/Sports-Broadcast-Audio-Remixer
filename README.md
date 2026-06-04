@@ -38,6 +38,25 @@ I began by trying a direct module-based approach in Python for source separation
 
 This initial notebook-based approach worked as a prototype, but the separation quality and overall output consistency were not good enough for the final goal.
 
----
+### Stage 2: Demucs Research, Better Separation, and Flask UI
 
-Next, I will add the following stages of the project as the pipeline evolved and improved.
+After the baseline attempt, I studied a few papers on Demucs (stored in the `Papers/` folder) to understand why neural source separation models perform better for complex broadcast audio.
+
+Based on that research, I moved to a Demucs-based pipeline and built a basic Flask UI so the system could be tested interactively on real sports videos.
+
+#### What this stage included
+
+- Reading Demucs-related papers and using those ideas to redesign the separation approach
+- Switching from the initial module-based split to a Demucs-driven two-stem workflow (`vocals` and `no_vocals`)
+- Building an end-to-end processing backend in Flask
+	- Upload sports video
+	- Analyze audio characteristics for guidance
+	- Extract audio with `ffmpeg`
+	- Run Demucs separation
+	- Remix commentary/crowd levels
+	- Attach remixed audio back to the video
+- Creating a simple browser-based UI for upload, controls, and processed output download/playback
+
+#### Outcome
+
+This stage gave much stronger separation quality than the initial prototype and made the project easier to demonstrate through a user-friendly web interface.
